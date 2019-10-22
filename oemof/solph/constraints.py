@@ -131,6 +131,54 @@ def generic_integral_limit(om, keyword, flows=None, limit=None):
     return om
 
 
+def shared_limit(model, name, variables, weights, upper_limit, lower_limit=0):
+    r"""
+    Adds a constraint to the given model
+    that limits the sum of weighted variables.
+
+    Parameters
+    ----------
+    model : oemof.solph.Model
+        Model to which the constraint is added.
+    name : str
+        Name for the equation e.g. in the LP file.
+    variables : list of pyomo.environ.Var
+    weights : list of floats
+        Has to have as many entries as vars
+    upper_limit : float > 0
+        Upper limit of sum over weighted vars
+    lower_limit : float >= 0
+        Lower limit of sum over weighted vars (defaults to 0)
+
+    **Constraint:**
+
+    .. math:: I \leq \sum_{i} V_i(t) \times w_i \leq S
+
+    The symbols used are defined as follows
+    (with Variables (V) and Parameters (P)):
+
+    ================ ==== =====================================================
+    math. symbol     type explanation
+    ================ ==== =====================================================
+    :math:`V_i(t)`   V    variable :math:`n` at time step :math:`t`
+    :math:`w_i`      P    weight given to Flow named according to `keyword`
+    :math:`I`        P    lower limit of the sum
+    :math:`S`        P    upper limit of the sum
+
+    """
+
+    def equate_variables_rule(m):
+        setattr(model, name, po.Expression(
+            expr=sum(om.flow[inflow, outflow, t]
+                     * om.timeincrement[t]
+                     * sequence(getattr(flows[inflow, outflow], keyword))[t]
+                     for (inflow, outflow) in flows
+                     for t in om.TIMESTEPS)))
+
+        setattr(om, limit_name + "_constraint", po.Constraint(
+            expr=(getattr(om, limit_name) <= limit)))
+
+
 def equate_variables(model, var1, var2, factor1=1, name=None):
     r"""
     Adds a constraint to the given model that set two variables to equal
